@@ -2,7 +2,7 @@
 
 ###### config ######
 
-mayaToPbrtLocation = '' # this folder. eg. '~/408/final/mayaToPbrt'
+mayaToPbrtLocation = '' # this folder. eg. '~/408/final/MayaToPbrt'
 assert mayaToPbrtLocation
 
 ###### end config ######
