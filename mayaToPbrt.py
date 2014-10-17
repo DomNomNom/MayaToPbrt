@@ -62,6 +62,16 @@ Film "image"
 
 WorldBegin
 
+TransformBegin
+	Rotate 90 0 0 1
+
+	LightSource "infinite" 
+		"color L" [0.100000 0.100000 0.100000]
+		"integer nsamples" [100]
+		"string mapname" ["CO332_26-05-2014_TeamCandy_2k.exr"]
+
+TransformEnd
+
 AttributeBegin
     CoordSysTransform "camera"
     LightSource "distant"
