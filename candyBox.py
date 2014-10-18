@@ -84,6 +84,17 @@ class CandyManager(object):
             int(self.candyBox.getAttr('seed'))
         )
 
+    # re-does the bloomy in a different quality
+    def repolygonize(self, polygonSpacing, path_obj=None):
+        if path_obj is None:
+            self.candyBox.path_obj
+        print 'repolygonize'
+        makeBlobby.polygonize(
+            self.candyBox.path_bloomy,
+            path_obj,
+            polygonSpacing=polygonSpacing
+        )
+
     # returns true if a reload is required
     def update(self):
         if self.firstTime:
@@ -99,19 +110,14 @@ class CandyManager(object):
                 withoutElement(self.newParams, self.index_polySpacing) !=
                 withoutElement(self.oldParams, self.index_polySpacing)
             ):
-                print 'full chain'
+                print 'full chain nerd making'
                 makeBlobby.makeBlob(  # TODO: refactor the API
                     self.candyBox.path_obj,
                     *self.newParams,
                     path_bloomy=self.candyBox.path_bloomy
                 )
             else:
-                print 'quality repolygonize'
-                makeBlobby.polygonize(
-                    self.candyBox.path_bloomy,
-                    self.candyBox.path_obj,
-                    polygonSpacing=self.newParams[self.index_polySpacing]
-                )
+                self.repolygonize(self.newParams[self.index_polySpacing])
 
             makeBlobby.centerObj(self.candyBox.path_obj)
 
@@ -178,7 +184,8 @@ def importObj(objPath):
 
 
 
-class CandyBox(pm.api.plugins.LocatorNode): # Locatos
+class CandyBox(pm.api.plugins.LocatorNode): # Locators
+
 
     @classmethod
     def initialize(cls):
@@ -211,7 +218,6 @@ class CandyBox(pm.api.plugins.LocatorNode): # Locatos
         def draw(view, path, style, status):
             self.path_obj    = '{}/{}{}.obj'.format(   path_baseObj,    self.path_prefix, self.name())
             self.path_bloomy = '{}/{}{}.bloomy'.format(path_baseBloomy, self.path_prefix, self.name())
-
 
             # if p.exists(self.path_obj):
             #     os.rename(self.path_obj, self.path_obj+'.old')
@@ -286,13 +292,17 @@ class CandyBox(pm.api.plugins.LocatorNode): # Locatos
                 view.endGL()
 
 
-        # pbrt obj export
+        # returns a export version of this (may adjust quality)
+        def getExportObj(self):
+            self.candyManager.repolygonize(0.05, objPath)
+            return objPath
 
 
         # set the functions
         # this is a hack. why can't I just define them at the class level? :(
         self.draw = draw
         self.getAttr = getAttr
+        self.getExportObj = getExportObj
         print 'end of constructor'
 
 

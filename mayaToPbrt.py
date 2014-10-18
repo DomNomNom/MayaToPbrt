@@ -34,6 +34,8 @@ from pymel.core import *
 import os
 from itertools import product, izip_longest
 import subprocess
+import candyBox
+import numpy as np
 
 uniformScale = 1
 
@@ -189,9 +191,6 @@ def exportPbrt(filePath):
 
     worldAttributes = ''
 
-    # metaballs
-    for metaball in ls(type='CandyBox'):
-        print 'found it'
 
     # lights
     for light in ls(lights=True):
@@ -293,11 +292,51 @@ def exportPbrt(filePath):
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
-
     # worldAttributes = balls
 
 
 
+
+
+
+
+    # metaballs
+    for metaball in ls(type='CandyBox'):
+        print 'processing metaball:', metaball.name()
+        path_bloomy = '{}/candyBox_{}.bloomy'.format(        candyBox.path_baseBloomy, metaball.name())
+        path_obj    = '{}/candyBox_{}_pbrtExport.obj'.format(candyBox.path_baseObj,    metaball.name())
+
+
+        candyBox.makeBlobby.polygonize(
+            path_bloomy,
+            path_obj,
+            polygonSpacing=0.05
+            # polygonSpacing=0.5
+        )
+
+        with open(path_obj) as f:
+            lines = f.readlines()
+        vertices  = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('v ' )])
+        normals   = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('vn ')])
+        faces     = np.array([ [ map(lambda x: int(x)-1, corner.split('//')) for corner in line.split()[1:] ] for line in lines if line.startswith('f ' )])
+        print 'len', len(vertices)
+
+
+        print 'shape up'
+        print normals.shape
+        normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
+
+        worldAttributes += meshTemplate.format(
+            transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
+            materialString='',
+            indices =stringContents(faces[:,:,0].reshape((-1,))),  # first, take only the first indecies. then linearize
+            points  =indent(stringContents2D(vertices),   3),
+            normalString=normalString,
+            # UVs     =indent(stringContents2D(zip(*UVs)), 3),
+        )
+
+
+    # compose
     pbrt = pbrtTemplate.format(
         # camTransform=indent(camTransformString, 1),
         # camTranslate=stringContents(camPos),
