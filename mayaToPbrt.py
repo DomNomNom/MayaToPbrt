@@ -32,10 +32,12 @@ if __name__ == '__main__':
 from pymel.core import *
 
 import os
+import glob
 from itertools import product, izip_longest
 import subprocess
 import candyBox
 import numpy as np
+import base64
 
 uniformScale = 1
 
@@ -106,26 +108,29 @@ AttributeEnd
 
 
 
-meshTemplate = '''
-AttributeBegin
+meshTemplate = '''AttributeBegin
     ConcatTransform [
 {transform}
     ]
 
     {materialString}
-    Shape "trianglemesh"
+    
+    Include "{geoFilePath}"
+AttributeEnd
+
+'''
+
+geoTemplate = '''
+Shape "trianglemesh"
         "integer indices" [{indices}]
         "point P" [
 {points}
         ]
 {normalString}
-AttributeEnd
 '''
 
 
-
-lightTemplate = '''
-AttributeBegin
+lightTemplate = '''AttributeBegin
     ConcatTransform [
 {transform}
     ]
@@ -133,7 +138,9 @@ AttributeBegin
     {lightText}
 
 AttributeEnd
+
 '''
+
 normalTemplate = '''
         "normal N" [
 {normals}
@@ -142,6 +149,7 @@ normalTemplate = '''
 # {UVs}
 #         ]
 
+commentTemplate = '# {comment}\n'
 
 areaLightTemplate = '''
     AreaLightSource "diffuse" "rgb L" [ {0} ]
@@ -213,7 +221,13 @@ def getLightIntensity(light):
 
 def exportPbrt(filePath):
     assert filePath.endswith('.pbrt')
-
+    
+    # directory for geometry for this scene
+    geoDirName = os.path.basename(sceneName()) + '.pbrt.d'
+    geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
+    if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
+    for p in glob.glob(geoDirPath + '/*'): os.remove(p)
+    
     # camera
     # by default we use the editors perspective view
     camera = nt.Camera(u'perspShape')
@@ -249,7 +263,8 @@ def exportPbrt(filePath):
         else:
             print "Unknown light type: " + str(light)
             continue
-
+        
+        worldAttributes += commentTemplate.format(comment=light.nodeName())
         worldAttributes += lightTemplate.format(
             transform=indent(stringContents2D(light.getParent().getTransformation()), 2),
             lightText=lightText,
@@ -316,15 +331,27 @@ def exportPbrt(filePath):
         # except:
         #     print 'bad color'
 
-
-        # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
-        worldAttributes += meshTemplate.format(
-            transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
-            materialString=materialString,
+        
+        geoFileName = base64.b64encode(mesh.nodeName()) + '.pbrt'
+        geoFilePath = geoDirPath + '/' + geoFileName
+        
+        geoAttributes = geoTemplate.format(
             indices =stringContents(indices),
             points  =indent(stringContents2D(verts),   3),
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
+        )
+        
+        with open(geoFilePath, 'w') as geoFile:
+            geoFile.write(commentTemplate.format(comment=mesh.nodeName()))
+            geoFile.write(geoAttributes)
+        
+        # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
+        worldAttributes += commentTemplate.format(comment=mesh.nodeName())
+        worldAttributes += meshTemplate.format(
+            transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
+            materialString=materialString,
+            geoFilePath=geoDirName + '/' + geoFileName
         )
     # worldAttributes = balls
 
@@ -359,16 +386,28 @@ def exportPbrt(filePath):
         print 'shape up'
         print normals.shape
         normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
-
-        worldAttributes += meshTemplate.format(
-            transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
-            materialString=nerdTextureTemplate,
+        
+        geoFileName = base64.b64encode(metaball.nodeName()) + '.pbrt'
+        geoFilePath = geoDirPath + '/' + geoFileName
+        
+        geoAttributes = geoTemplate.format(
             indices =stringContents(faces[:,:,0].reshape((-1,))),  # first, take only the first indecies. then linearize
             points  =indent(stringContents2D(vertices),   3),
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
-
+        
+        with open(geoFilePath, 'w') as geoFile:
+            geoFile.write(commentTemplate.format(comment=metaball.nodeName()))
+            geoFile.write(geoAttributes)
+        
+        # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
+        worldAttributes += commentTemplate.format(comment=metaball.nodeName())
+        worldAttributes += meshTemplate.format(
+            transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
+            materialString=nerdTextureTemplate,
+            geoFilePath=geoDirName + '/' + geoFileName
+        )
 
     # compose
     pbrt = pbrtTemplate.format(
