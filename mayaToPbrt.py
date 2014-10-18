@@ -17,6 +17,12 @@ pbrtExecutable = p.expanduser(pbrtExecutable)
 # mayaSceneFile = basePath+'/cuube.ma'  # only needed in standalone
 
 
+def ensurePathExists( path ):
+    path = p.dirname( path )
+    print path
+    if not p.exists( path ):
+        os.makedirs( path )
+
 
 if __name__ == '__main__':
     print 'starting pymel...'  # A printout to say that we are starting
@@ -42,7 +48,7 @@ def stringContents2D(matrix):
     return '\n'.join([ stringContents(row) for row in matrix ])
 
 
-pbrtTemplate = '''
+pbrtPreviewTemplate = '''
 Scale -1 1 1
 LookAt
     {camPos}
@@ -75,6 +81,76 @@ AttributeEnd
 WorldEnd
 '''
 
+pbrtRenderTemplate = '''
+Scale -1 1 1
+LookAt
+    {camPos}
+    {camLookAt}
+    0 1 0
+
+Camera "perspective"
+    "float fov" [{camFov}]
+
+PixelFilter "mitchell"
+    "float xwidth" [2]
+    "float ywidth" [2]
+Sampler "bestcandidate"
+Film "image"
+    "integer xresolution" [600]
+    "integer yresolution" [600]
+
+WorldBegin
+
+AttributeBegin
+    CoordSysTransform "camera"
+    LightSource "distant"
+        "point from" [0 0 0]
+        "point to"   [0 0 1]
+        "rgb L"    [1 1 1]
+AttributeEnd
+
+{worldAttributes}
+
+WorldEnd
+'''
+
+pbrtRenderFinalTemplate = '''
+Scale -1 1 1
+LookAt
+    {camPos}
+    {camLookAt}
+    0 1 0
+
+Camera "perspective"
+    "float fov" [{camFov}]
+
+PixelFilter "mitchell"
+    "float xwidth" [2]
+    "float ywidth" [2]
+Sampler "bestcandidate"
+Film "image"
+    "integer xresolution" [600]
+    "integer yresolution" [600]
+
+DifferentialEnable
+DifferentialBackground "string filename" "bg0.exr"
+DifferentialHDR "exponential" "float exposure" [0.5] "float diffscale" [2.0]
+
+WorldBegin
+
+AttributeBegin
+    CoordSysTransform "camera"
+    LightSource "distant"
+        "point from" [0 0 0]
+        "point to"   [0 0 1]
+        "rgb L"    [1 1 1]
+AttributeEnd
+
+{worldAttributes}
+
+WorldEnd
+'''
+
 balls = '''
 # an orangish sphere
 AttributeBegin
@@ -91,7 +167,11 @@ AttributeBegin
 AttributeEnd
 '''
 
-
+differentialTemplate = '''
+DifferentialBegin
+{attributes}
+DifferentialEnd
+'''
 
 meshTemplate = '''
 AttributeBegin
@@ -107,6 +187,32 @@ AttributeBegin
         ]
 {normalString}
 AttributeEnd
+'''
+
+
+lightningTemplate = '''
+DifferentialBegin
+AttributeBegin
+    ConcatTransform [
+{transform}
+    ]
+
+    # {materialString}
+
+    Material "glass"
+        "color Kr" [ 0 0 0 ]
+        "color Kt" [ 1 1 1 ]
+
+
+    AreaLightSource "diffuse" "rgb L" [ 10 10 10 ]
+
+    Shape "trianglemesh"
+        "integer indices" [{indices}]
+        "point P" [
+{points}
+        ]
+AttributeEnd
+DifferentialEnd
 '''
 
 
@@ -131,7 +237,7 @@ normalTemplate = '''
 
 
 areaLightTemplate = '''
-    AreaLightSource "diffuse" "rgb L" [ {0} ]
+    #AreaLightSource "diffuse" "rgb L" [ {0} ]
 
     Shape "trianglemesh"
         "integer indices" [0 1 2 2 1 3]
@@ -167,7 +273,7 @@ def getLightIntensity(light):
     return (light.getColor()*light.getIntensity())[:-1]
 
 
-def exportPbrt(filePath):
+def exportPbrt(filePath, pbrtArg):
     assert filePath.endswith('.pbrt')
 
     # camera
@@ -205,88 +311,90 @@ def exportPbrt(filePath):
             print "Unknown light type: " + str(light)
             continue
 
-        worldAttributes += lightTemplate.format(
+        lightString = lightTemplate.format(
             transform=indent(stringContents2D(light.getParent().getTransformation()), 2),
             lightText=lightText,
         )
 
+        if :
+            worldAttributes += differentialTemplate.format(
+                attributes = lightString
+            )
+        else :
+            worldAttributes += lightString
+
+
+
     # meshes
     for mesh in ls(type='mesh'):
-        trianglesPerPoly, vertexIndices = mesh.getTriangles()
-
-        trianglePointCounts, pointIndicies   = mesh.getVertices()
-
-
-        if slowNormals:
-            points  = mesh.getPoints()
-            verts = []
-            normals = []
-            for triangleVertexIndecies in grouper(3, vertexIndices):  # for each triangle
-                faceSets = ( { face.index() for face in mesh.verts[i].connectedFaces() } for i in triangleVertexIndecies )
-                faceIndex = reduce(lambda a,b: a.intersection(b), faceSets).pop()
-                for vertexIndex in triangleVertexIndecies:
-                    verts.append(points[vertexIndex])
-                    normals.append(mesh.getFaceVertexNormal(faceIndex, vertexIndex, space='preTransform'))
-
-            indices = xrange(len(normals))
-            normalString = normalTemplate.format(normals =indent(stringContents2D(normals), 3))
-        else:
-            verts = mesh.getPoints()
-            indices = vertexIndices
-            normalString = ''
-
-        # print getClosestNorma
-        # print len(points)
-        # print len(indices)
-        # print len(normals)
-        # print len(verts)
-
-        # material
-        materialString = ''
-        # try:
-        shadingGroups = mesh.shadingGroups()
-        if shadingGroups:
-            lamberts = filter(lambda x: isinstance(x,nt.Lambert), shadingGroups[0].inputs())
-            if lamberts:
-                lambert = lamberts[0]
-
-                # check for pbrt-texture inputs
-                pbrtTextures = filter(lambda x: 'PbrtTextureNode' in str(x.type()), lambert.inputs())
-                if pbrtTextures:
-                    pbrtTexture = pbrtTextures[0]
-                    materialString = damascusTextureTemplate.format(
-                        # pbrtTexture.attr(pbrtTexture.hammerStrength  ),
-                        # pbrtTexture.attr(pbrtTexture.hammerFrequency ),
-                        # pbrtTexture.attr(pbrtTexture.layerThickness  )
-                        pbrtTexture.attr('attrib_hammerStrength').get(),
-                        pbrtTexture.attr('attrib_hammerFrequency').get(),
-                        pbrtTexture.attr('attrib_layerThickness').get()
-                    )
-                else:
-                    materialString = 'Material "matte" "rgb Kd" [ {0} ]'.format(
-                        stringContents(lambert.getColor()[:-1])
-                    )
-
-
-        # except:
-        #     print 'bad color'
-
+        trans, mat, i, p, n = getMesh( mesh )
 
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += meshTemplate.format(
-            transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
-            materialString=materialString,
-            indices =stringContents(indices),
-            points  =indent(stringContents2D(verts),   3),
-            normalString=normalString,
+            transform=trans,
+            materialString=mat,
+            indices =i,
+            points  =p,
+            normalString=n
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
 
-    # worldAttributes = balls
+        if :
+            worldAttributes += differentialTemplate.format(
+                attributes = meshString
+            )
+        else :
+            worldAttributes += meshString
+
+    #Lightning from NURBS!!!!!!!
+
+    for lightning in ls(type='nurbsSurface'):
+        lightningMeshStringList = nurbsToPoly(
+            lightning,
+            mnd = True,
+            ch = False,
+            f = 1,
+            pt = 0,
+            chr = 0.9,    #Chord Height Ratio
+            ft = 10.0,     #Fractional Tolerance
+            mel = 0.1,    #Min Edge Length
+            d = 10.0,      #Delta
+            ntr = False,
+            mrt = False,
+            uss = False
+        )
+        lightningTransform = PyNode( lightningMeshStringList[ 0 ] )
+        mesh = lightningTransform.getChildren()[0]
+        polyReduce(
+            mesh.f,
+            ver = 1,
+            trm = 2,
+            tct = 250,
+            shp = 0.5,
+            preserveTopology = False,
+            keepQuadsWeight = False,
+            vertexMapName = "",
+            replaceOriginal = True,
+            cachingReduce = True,
+            ch = True
+        )
+
+        trans, mat, i, p, n = getMesh( mesh )
+
+        delete( lightningTransform )
+
+        # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
+        worldAttributes += lightningTemplate.format(
+            transform=trans,
+            materialString=mat,
+            indices =i,
+            points  =p
+            # normalString=n
+            # UVs     =indent(stringContents2D(zip(*UVs)), 3),
+        )
 
 
-
-    pbrt = pbrtTemplate.format(
+    pbrt = pbrtArg.format(
         # camTransform=indent(camTransformString, 1),
         # camTranslate=stringContents(camPos),
         camPos      =stringContents(camPos),
@@ -301,6 +409,133 @@ def exportPbrt(filePath):
         f.write(pbrt)
 
 
+def getMesh( mesh ):
+    trianglesPerPoly, vertexIndices = mesh.getTriangles()
+
+    trianglePointCounts, pointIndicies   = mesh.getVertices()
+
+
+    if slowNormals:
+        points  = mesh.getPoints()
+        verts = []
+        normals = []
+        for triangleVertexIndecies in grouper(3, vertexIndices):  # for each triangle
+            faceSets = ( { face.index() for face in mesh.verts[i].connectedFaces() } for i in triangleVertexIndecies )
+            faceIndex = reduce(lambda a,b: a.intersection(b), faceSets).pop()
+            for vertexIndex in triangleVertexIndecies:
+                verts.append(points[vertexIndex])
+                normals.append(mesh.getFaceVertexNormal(faceIndex, vertexIndex, space='preTransform'))
+
+        indices = xrange(len(normals))
+        normalString = normalTemplate.format(normals =indent(stringContents2D(normals), 3))
+    else:
+        verts = mesh.getPoints()
+        indices = vertexIndices
+        normalString = ''
+
+    # print getClosestNorma
+    # print len(points)
+    # print len(indices)
+    # print len(normals)
+    # print len(verts)
+
+    # material
+    materialString = ''
+    # try:
+    shadingGroups = mesh.shadingGroups()
+    if shadingGroups:
+        lamberts = filter(lambda x: isinstance(x,nt.Lambert), shadingGroups[0].inputs())
+        if lamberts:
+            lambert = lamberts[0]
+
+            # check for pbrt-texture inputs
+            pbrtTextures = filter(lambda x: 'PbrtTextureNode' in str(x.type()), lambert.inputs())
+            if pbrtTextures:
+                pbrtTexture = pbrtTextures[0]
+                materialString = damascusTextureTemplate.format(
+                    # pbrtTexture.attr(pbrtTexture.hammerStrength  ),
+                    # pbrtTexture.attr(pbrtTexture.hammerFrequency ),
+                    # pbrtTexture.attr(pbrtTexture.layerThickness  )
+                    pbrtTexture.attr('attrib_hammerStrength').get(),
+                    pbrtTexture.attr('attrib_hammerFrequency').get(),
+                    pbrtTexture.attr('attrib_layerThickness').get()
+                )
+            else:
+                materialString = 'Material "matte" "rgb Kd" [ {0} ]'.format(
+                    stringContents(lambert.getColor()[:-1])
+                )
+
+
+    # except:
+    #     print 'bad color'
+    # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
+
+    return stringContents2D(mesh.getParent().getTransformation()), materialString, stringContents(indices), stringContents2D(verts), normalString
+
+
+
+
+
+
+
+
+
+
+# converts current scene frame to pbrt, renders it to exr, converts exr to png
+def renderSequence( frame, preview = True ):
+    assert pbrtExecutable
+    scenePath = sceneName()
+    assert scenePath
+    if currentTime( query = True ) is not frame :
+        currentTime( frame, edit = True )
+
+
+    sceneDir, mayaFileName = p.split( scenePath )
+    fileName = mayaFileName + '{:04d}'.format( frame )
+
+
+    sequencePath = p.join( sceneDir, mayaFileName + '_seq' )
+    pbrtRenderPath = os.path.abspath( p.join( sequencePath, fileName + '.pbrt' ) )
+
+    print "making pbrt file:", pbrtRenderPath
+    ensurePathExists( pbrtRenderPath )
+    exportPbrt(pbrtRenderPath, pbrtRenderTemplate)
+
+    return None
+
+
+    if preview :
+        previewPath = p.join( sequencePath, 'preview' )
+        pbrtPreviewPath = os.path.abspath( p.join( previewPath, fileName + '.pbrt' ) )
+        exrPath  = os.path.abspath(scenePath  + '.exr'  ) #only have one working file
+        pngPath  = os.path.abspath(pbrtPreviewPath   + '.png'  )
+
+        print "making pbrt preview file:", pbrtPreviewPath
+        ensurePathExists( pbrtPreviewPath )
+        exportPbrt(pbrtPreviewPath, pbrtPreviewTemplate)
+
+
+        proc = subprocess.Popen([
+                '{2} --outfile "{0}" "{1}"'.format(exrPath, pbrtPreviewPath, pbrtExecutable)
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True  # bad security practice
+        )
+
+        print
+        print ' ====== begin pbrt output ====== '
+        out, err = proc.communicate()
+        # print out
+        print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
+        print ' ====== end pbrt output ====== '
+        print
+
+        os.system('convert "{0}" "{1}"'.format(exrPath, pngPath))  # convert .exr to .png
+
+        return pngPath
+
+
 # converts current scene to pbrt, renders it to exr, converts exr to png
 def render():
     assert pbrtExecutable
@@ -311,10 +546,10 @@ def render():
     exrPath  = os.path.abspath(pbrtPath  + '.exr'  )
     pngPath  = os.path.abspath(exrPath   + '.png'  )
     print "making pbrt file:", pbrtPath
-    exportPbrt(pbrtPath)
+    exportPbrt(pbrtPath, pbrtRenderTemplate)
     # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(exrPath, pbrtPath))
 
-    p = subprocess.Popen([
+    proc = subprocess.Popen([
             '{2} --outfile "{0}" "{1}"'.format(exrPath, pbrtPath, pbrtExecutable)
         ],
         stdout=subprocess.PIPE,
@@ -324,21 +559,20 @@ def render():
 
     print
     print ' ====== begin pbrt output ====== '
-    out, err = p.communicate()
+    out, err = proc.communicate()
     # print out
     print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
     print ' ====== end pbrt output ====== '
     print
 
     os.system('convert "{0}" "{1}"'.format(exrPath, pngPath))  # convert .exr to .png
-    os.system('convert "{0}" "{1}"'.format(exrPath, pngPath))  # convert .exr to .png
 
     return pngPath
 
 
-if __name__ == '__main__':
-    openFile(mayaSceneFile)
-    # exportPbrt("/u/students/domnom/408/scenes/cuube.pbrt")
-    pngPath = render()
-    print 'done. \nOutput file:', pngPath
-    os.system('gnome-open "{0}"'.format(pngPath))
+# if __name__ == '__main__':
+#     openFile(mayaSceneFile)
+#     # exportPbrt("/u/students/domnom/408/scenes/cuube.pbrt")
+#     pngPath = render()
+#     print 'done. \nOutput file:', pngPath
+#     os.system('gnome-open "{0}"'.format(pngPath))

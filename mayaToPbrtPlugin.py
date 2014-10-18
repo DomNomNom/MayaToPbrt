@@ -3,6 +3,7 @@
 ###### config ######
 
 mayaToPbrtLocation = '' # this folder. eg. '~/408/final/MayaToPbrt'
+frames = 5 #23.976fps
 assert mayaToPbrtLocation
 
 ###### end config ######
@@ -19,12 +20,16 @@ sys.path.append(mayaToPbrtLocation)  # where mayaToPbrt is
 import mayaToPbrt
 
 
-
 def doRender(preview):
     reload(mayaToPbrt)
     pngPath = mayaToPbrt.render()
     preview.setImage(pngPath)
     print 'done', pngPath
+
+def doRenderSequence(preview):
+    reload(mayaToPbrt)
+    for frame in xrange( 0, frames ) :
+        mayaToPbrt.renderSequence( frame, preview = False)
 
 win = None
 def initializePlugin(mobject):
@@ -35,13 +40,19 @@ def initializePlugin(mobject):
     layout = columnLayout()
     preview = image(
         # image=sceneName()+'.pbrt.exr.png',
-        width=200,
-        height=200,
+        width=400,
+        height=600,
     )
     button(
         command=Callback(doRender, preview),
         label="Pbrt Render",
-        width=200,
+        width=400,
+        height=100,
+    )
+    button(
+        command=Callback(doRenderSequence, preview),
+        label="Pbrt Render Sequence",
+        width=400,
         height=100,
     )
 
