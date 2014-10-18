@@ -65,10 +65,13 @@ Camera "perspective"
 PixelFilter "mitchell"
     "float xwidth" [2]
     "float ywidth" [2]
+
 Sampler "bestcandidate"
+    "integer pixelsamples" [50]
+
 Film "image"
-    "integer xresolution" [200]
-    "integer yresolution" [200]
+    "integer xresolution" [400]
+    "integer yresolution" [400]
 
 WorldBegin
 
@@ -166,6 +169,37 @@ damascusTextureTemplate = '''
         "rgb Kr" [.5 .5 .5]
 
 '''
+
+nerdTextureTemplate = '''
+    MakeNamedMaterial "nerdMatte"
+        "string type" "matte"
+        "rgb Kd" [.1 .4 .1]
+
+
+    MakeNamedMaterial "nerdPlastic"
+        "string type" "plastic"
+        "rgb Kd" [.1 .4 .1]
+        "float roughness" [0.2]
+
+    MakeNamedMaterial "nerdMetal"
+        "string type" "metal"
+        "rgb eta" [1.0 1.0 1.0]
+        "rgb k" [.1 .9 .1]
+        "float roughness" 0.5
+
+    MakeNamedMaterial "nerdMix"
+        "string type" "mix"
+        "float amount" [0.1]
+        "string namedmaterial1" "nerdMatte"
+        "string namedmaterial2" "nerdMetal"
+
+    # NamedMaterial "nerdMatte"
+    # NamedMaterial "nerdPlastic"
+    # NamedMaterial "nerdMetal"
+    NamedMaterial "nerdMix"
+
+'''
+
 
 
 def grouper(n, iterable, fillvalue=None):
@@ -328,7 +362,7 @@ def exportPbrt(filePath):
 
         worldAttributes += meshTemplate.format(
             transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
-            materialString='',
+            materialString=nerdTextureTemplate,
             indices =stringContents(faces[:,:,0].reshape((-1,))),  # first, take only the first indecies. then linearize
             points  =indent(stringContents2D(vertices),   3),
             normalString=normalString,
