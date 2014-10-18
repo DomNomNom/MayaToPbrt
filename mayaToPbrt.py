@@ -1,16 +1,24 @@
+#!/bin/env python
 
-import os.path as p
+# path shenanigans
+import sys
+import os.path as p  # not to be confused with sys.path
+def addToPath(searchPath):
+    if searchPath not in sys.path:
+        sys.path.append(searchPath)
+path_this = p.expanduser('~/teamCandy/MayaToPbrt/')
+addToPath(path_this)
 
 
 ###### config ######
 
-pbrtExecutable = ''     # eg. '~/408/final/comp408-project3/bin/pbrt'
+path_pbrtExecutable = '~/teamCandy/comp408-project3/build/bin/pbrt'     # eg. '~/408/final/comp408-project3/bin/pbrt'
 slowNormals = False
 
 ###### end config ######
 
-assert pbrtExecutable
-pbrtExecutable = p.expanduser(pbrtExecutable)
+assert path_pbrtExecutable
+path_pbrtExecutable = p.expanduser(path_pbrtExecutable)
 
 
 # basePath = p.expanduser('~/maya/2015-x64/plug-ins/MayaToPBRT-data')
@@ -181,6 +189,10 @@ def exportPbrt(filePath):
 
     worldAttributes = ''
 
+    # metaballs
+    for metaball in ls(type='CandyBox'):
+        print 'found it'
+
     # lights
     for light in ls(lights=True):
         if isinstance(light, nodetypes.PointLight):
@@ -303,19 +315,19 @@ def exportPbrt(filePath):
 
 # converts current scene to pbrt, renders it to exr, converts exr to png
 def render():
-    assert pbrtExecutable
+    assert path_pbrtExecutable
 
-    scenePath = sceneName()
-    assert scenePath
-    pbrtPath = os.path.abspath(scenePath + '.pbrt' )
-    exrPath  = os.path.abspath(pbrtPath  + '.exr'  )
-    pngPath  = os.path.abspath(exrPath   + '.png'  )
-    print "making pbrt file:", pbrtPath
-    exportPbrt(pbrtPath)
-    # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(exrPath, pbrtPath))
+    path_scene = sceneName()
+    assert path_scene
+    path_pbrtFile = os.path.abspath(path_scene     + '.pbrt' )
+    path_exr      = os.path.abspath(path_pbrtFile  + '.exr'  )
+    path_png      = os.path.abspath(path_exr       + '.png'  )
+    print "making pbrt file:", path_pbrtFile
+    exportPbrt(path_pbrtFile)
+    # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile))
 
     p = subprocess.Popen([
-            '{2} --outfile "{0}" "{1}"'.format(exrPath, pbrtPath, pbrtExecutable)
+            '{2} --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile, path_pbrtExecutable)
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -330,15 +342,14 @@ def render():
     print ' ====== end pbrt output ====== '
     print
 
-    os.system('convert "{0}" "{1}"'.format(exrPath, pngPath))  # convert .exr to .png
-    os.system('convert "{0}" "{1}"'.format(exrPath, pngPath))  # convert .exr to .png
+    os.system('convert "{0}" "{1}"'.format(path_exr, path_png))  # convert .exr to .png
 
-    return pngPath
+    return path_png
 
 
 if __name__ == '__main__':
     openFile(mayaSceneFile)
     # exportPbrt("/u/students/domnom/408/scenes/cuube.pbrt")
-    pngPath = render()
-    print 'done. \nOutput file:', pngPath
-    os.system('gnome-open "{0}"'.format(pngPath))
+    path_png = render()
+    print 'done. \nOutput file:', path_png
+    os.system('gnome-open "{0}"'.format(path_png))

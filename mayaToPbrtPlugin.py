@@ -1,21 +1,18 @@
+#!/bin/env python
 
-
-###### config ######
-
-mayaToPbrtLocation = '' # this folder. eg. '~/408/final/MayaToPbrt'
-assert mayaToPbrtLocation
-
-###### end config ######
-
-
+# path shenanigans
+import sys
+import os.path as p  # not to be confused with sys.path
+def addToPath(searchPath):
+    if searchPath not in sys.path:
+        sys.path.append(searchPath)
+path_this = p.expanduser('~/teamCandy/MayaToPbrt/')
+addToPath(path_this)
 
 
 from pymel.core import *
 import sys
 
-import os.path as p
-mayaToPbrtLocation = p.expanduser(mayaToPbrtLocation)
-sys.path.append(mayaToPbrtLocation)  # where mayaToPbrt is
 import mayaToPbrt
 
 
