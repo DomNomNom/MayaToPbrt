@@ -63,10 +63,21 @@ PixelFilter "mitchell"
     "float ywidth" [2]
 Sampler "bestcandidate"
 Film "image"
-    "integer xresolution" [200]
-    "integer yresolution" [200]
+    "integer xresolution" [576]
+    "integer yresolution" [384]
 
 WorldBegin
+
+TransformBegin
+	Rotate 90 0 0 1
+	Rotate 90 0 1 0
+
+	LightSource "infinite" 
+		"color L" [0.100000 0.100000 0.100000]
+		"integer nsamples" [100]
+		"string mapname" ["CO332_26-05-2014_TeamCandy_2k.exr"]
+
+TransformEnd
 
 AttributeBegin
     CoordSysTransform "camera"
