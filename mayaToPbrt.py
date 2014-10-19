@@ -78,13 +78,15 @@ Film "image"
 WorldBegin
 
 TransformBegin
+    # it is NOT possible to line up everything in the envmap
+    #Rotate 16.8 1 0 0
     Rotate 90 0 0 1
     Rotate 90 0 1 0
-
+    
     LightSource "infinite" 
         "color L" [0.500000 0.500000 0.500000]
-        "integer nsamples" [20]
-        "string mapname" "../images/CO332_26-05-2014_TeamCandy_2k.exr"
+        "integer nsamples" [5]
+        "string mapname" "../images/CO332_26-05-2014_TeamCandy_2k flipped.exr"
 
 TransformEnd
 
