@@ -114,7 +114,17 @@ meshTemplate = '''AttributeBegin
     ]
 
     {materialString}
-    
+
+    Include "{geoFilePath}"
+AttributeEnd
+
+'''
+
+emitterTemplate = '''AttributeBegin
+    AreaLightSource "diffuse" "rgb L" [ 10 10 10 ]
+    ConcatTransform [
+{transform}
+    ]
     Include "{geoFilePath}"
 AttributeEnd
 
@@ -219,15 +229,15 @@ def getLightIntensity(light):
     return (light.getColor()*light.getIntensity())[:-1]
 
 
-def exportPbrt(filePath):
+def exportPbrt(pbrtWrapperTemplate, filePath):
     assert filePath.endswith('.pbrt')
-    
+
     # directory for geometry for this scene
-    geoDirName = os.path.basename(sceneName()) + '.pbrt.d'
+    geoDirName = os.path.basename(filePath) + '.d'
     geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
     if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
     for p in glob.glob(geoDirPath + '/*'): os.remove(p)
-    
+
     # camera
     # by default we use the editors perspective view
     camera = nt.Camera(u'perspShape')
@@ -263,7 +273,7 @@ def exportPbrt(filePath):
         else:
             print "Unknown light type: " + str(light)
             continue
-        
+
         worldAttributes += commentTemplate.format(comment=light.nodeName())
         worldAttributes += lightTemplate.format(
             transform=indent(stringContents2D(light.getParent().getTransformation()), 2),
@@ -272,34 +282,8 @@ def exportPbrt(filePath):
 
     # meshes
     for mesh in ls(type='mesh'):
-        trianglesPerPoly, vertexIndices = mesh.getTriangles()
 
-        trianglePointCounts, pointIndicies   = mesh.getVertices()
-
-
-        if slowNormals:
-            points  = mesh.getPoints()
-            verts = []
-            normals = []
-            for triangleVertexIndecies in grouper(3, vertexIndices):  # for each triangle
-                faceSets = ( { face.index() for face in mesh.verts[i].connectedFaces() } for i in triangleVertexIndecies )
-                faceIndex = reduce(lambda a,b: a.intersection(b), faceSets).pop()
-                for vertexIndex in triangleVertexIndecies:
-                    verts.append(points[vertexIndex])
-                    normals.append(mesh.getFaceVertexNormal(faceIndex, vertexIndex, space='preTransform'))
-
-            indices = xrange(len(normals))
-            normalString = normalTemplate.format(normals =indent(stringContents2D(normals), 3))
-        else:
-            verts = mesh.getPoints()
-            indices = vertexIndices
-            normalString = ''
-
-        # print getClosestNorma
-        # print len(points)
-        # print len(indices)
-        # print len(normals)
-        # print len(verts)
+        geoDirString = exportGeo( geoDirPath, geoDirName, mesh )
 
         # material
         materialString = ''
@@ -327,38 +311,55 @@ def exportPbrt(filePath):
                         stringContents(lambert.getColor()[:-1])
                     )
 
-
-        # except:
-        #     print 'bad color'
-
-        
-        geoFileName = base64.b64encode(mesh.nodeName()) + '.pbrt'
-        geoFilePath = geoDirPath + '/' + geoFileName
-        
-        geoAttributes = geoTemplate.format(
-            indices =stringContents(indices),
-            points  =indent(stringContents2D(verts),   3),
-            normalString=normalString,
-            # UVs     =indent(stringContents2D(zip(*UVs)), 3),
-        )
-        
-        with open(geoFilePath, 'w') as geoFile:
-            geoFile.write(commentTemplate.format(comment=mesh.nodeName()))
-            geoFile.write(geoAttributes)
-        
-        # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=mesh.nodeName())
         worldAttributes += meshTemplate.format(
             transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
             materialString=materialString,
-            geoFilePath=geoDirName + '/' + geoFileName
+            geoFilePath=geoDirString
         )
-    # worldAttributes = balls
 
+    #lightning
+    for lightning in ls(type='nurbsSurface'):
+        lightningMeshStringList = nurbsToPoly(
+            lightning,
+            mnd = True,
+            ch = False,
+            f = 1,
+            pt = 0,
+            chr = 0.9,    #Chord Height Ratio
+            ft = 10.0,     #Fractional Tolerance
+            mel = 0.1,    #Min Edge Length
+            d = 10.0,      #Delta
+            ntr = False,
+            mrt = False,
+            uss = False
+        )
+        lightningTransform = PyNode( lightningMeshStringList[ 0 ] )
+        mesh = lightningTransform.getChildren()[0]
+        polyReduce(
+            mesh.f,
+            ver = 1,
+            trm = 2,
+            tct = 200,
+            shp = 0.5,
+            preserveTopology = False,
+            keepQuadsWeight = False,
+            vertexMapName = "",
+            replaceOriginal = True,
+            cachingReduce = True,
+            ch = True
+        )
 
+        geoDirString = exportGeo( geoDirPath, geoDirName, mesh )
+        materialString = ''
 
+        worldAttributes += commentTemplate.format(comment='LIGHTNING -- ' + mesh.nodeName())
+        worldAttributes += emitterTemplate.format(
+            transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
+            geoFilePath=geoDirString
+        )
 
-
+        delete( lightningTransform )
 
 
     # metaballs
@@ -386,21 +387,21 @@ def exportPbrt(filePath):
         print 'shape up'
         print normals.shape
         normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
-        
+
         geoFileName = base64.b64encode(metaball.nodeName()) + '.pbrt'
         geoFilePath = geoDirPath + '/' + geoFileName
-        
+
         geoAttributes = geoTemplate.format(
             indices =stringContents(faces[:,:,0].reshape((-1,))),  # first, take only the first indecies. then linearize
             points  =indent(stringContents2D(vertices),   3),
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
-        
+
         with open(geoFilePath, 'w') as geoFile:
             geoFile.write(commentTemplate.format(comment=metaball.nodeName()))
             geoFile.write(geoAttributes)
-        
+
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=metaball.nodeName())
         worldAttributes += meshTemplate.format(
@@ -410,7 +411,7 @@ def exportPbrt(filePath):
         )
 
     # compose
-    pbrt = pbrtTemplate.format(
+    pbrt = pbrtWrapperTemplate.format(
         # camTransform=indent(camTransformString, 1),
         # camTranslate=stringContents(camPos),
         camPos      =stringContents(camPos),
@@ -425,8 +426,47 @@ def exportPbrt(filePath):
         f.write(pbrt)
 
 
+def exportGeo( geoDirPath, geoDirName, mesh ) :
+    trianglesPerPoly, vertexIndices = mesh.getTriangles()
+    trianglePointCounts, pointIndicies   = mesh.getVertices()
+
+    if slowNormals:
+        points  = mesh.getPoints()
+        verts = []
+        normals = []
+        for triangleVertexIndecies in grouper(3, vertexIndices):  # for each triangle
+            faceSets = ( { face.index() for face in mesh.verts[i].connectedFaces() } for i in triangleVertexIndecies )
+            faceIndex = reduce(lambda a,b: a.intersection(b), faceSets).pop()
+            for vertexIndex in triangleVertexIndecies:
+                verts.append(points[vertexIndex])
+                normals.append(mesh.getFaceVertexNormal(faceIndex, vertexIndex, space='preTransform'))
+
+        indices = xrange(len(normals))
+        normalString = normalTemplate.format(normals =indent(stringContents2D(normals), 3))
+    else:
+        verts = mesh.getPoints()
+        indices = vertexIndices
+        normalString = ''
+
+    geoFileName = base64.b64encode(mesh.nodeName()) + '.pbrt'
+    geoFilePath = geoDirPath + '/' + geoFileName
+
+    geoAttributes = geoTemplate.format(
+        indices =stringContents(indices),
+        points  =indent(stringContents2D(verts),   3),
+        normalString=normalString,
+    )
+
+    with open(geoFilePath, 'w') as geoFile:
+        geoFile.write(commentTemplate.format(comment=mesh.nodeName()))
+        geoFile.write(geoAttributes)
+
+    # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
+    return geoDirName + '/' + geoFileName
+
+
 # converts current scene to pbrt, renders it to exr, converts exr to png
-def render():
+def render() :
     assert path_pbrtExecutable
 
     path_scene = sceneName()
@@ -435,7 +475,7 @@ def render():
     path_exr      = os.path.abspath(path_pbrtFile  + '.exr'  )
     path_png      = os.path.abspath(path_exr       + '.png'  )
     print "making pbrt file:", path_pbrtFile
-    exportPbrt(path_pbrtFile)
+    exportPbrt(pbrtTemplate, path_pbrtFile)
     # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile))
 
     p = subprocess.Popen([
@@ -465,3 +505,18 @@ if __name__ == '__main__':
     path_png = render()
     print 'done. \nOutput file:', path_png
     os.system('gnome-open "{0}"'.format(path_png))
+
+
+def exportSequence( frame ) :
+    if currentTime( query = True ) is not frame :
+        currentTime( frame, edit = True )
+
+    pbrtScenes = 'teamCandy/scenesPbrt/'
+
+    scenePath = sceneName()
+    assert scenePath
+    sceneDir, mayaFileName = p.split( scenePath )
+    fileName = mayaFileName + '.{:04d}'.format(frame)
+
+    path_pbrtFile = os.path.abspath(pbrtScenes + '/' + fileName + '.pbrt')
+    exportPbrt(pbrtTemplate, path_pbrtFile)
