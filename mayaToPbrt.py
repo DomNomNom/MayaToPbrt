@@ -69,21 +69,21 @@ PixelFilter "mitchell"
     "float ywidth" [2]
 
 Sampler "bestcandidate"
-    "integer pixelsamples" [50]
+    "integer pixelsamples" [320]
 
 Film "image"
-    "integer xresolution" [400]
-    "integer yresolution" [400]
+    "integer xresolution" [200]
+    "integer yresolution" [200]
 
 WorldBegin
 
-AttributeBegin
-    CoordSysTransform "camera"
-    LightSource "distant"
-        "point from" [0 0 0]
-        "point to"   [0 0 1]
-        "rgb L"    [1 1 1]
-AttributeEnd
+# AttributeBegin
+#     CoordSysTransform "camera"
+#     LightSource "distant"
+#         "point from" [0 0 0]
+#         "point to"   [0 0 1]
+#         "rgb L"    [1 1 1]
+# AttributeEnd
 
 {worldAttributes}
 
@@ -114,7 +114,7 @@ meshTemplate = '''AttributeBegin
     ]
 
     {materialString}
-    
+
     Include "{geoFilePath}"
 AttributeEnd
 
@@ -181,7 +181,7 @@ damascusTextureTemplate = '''
 nerdTextureTemplate = '''
     MakeNamedMaterial "nerdMatte"
         "string type" "matte"
-        "rgb Kd" [.1 .4 .1]
+        "rgb Kd" [.3 .7 .3]
 
 
     MakeNamedMaterial "nerdPlastic"
@@ -192,12 +192,12 @@ nerdTextureTemplate = '''
     MakeNamedMaterial "nerdMetal"
         "string type" "metal"
         "rgb eta" [1.0 1.0 1.0]
-        "rgb k" [.1 .9 .1]
-        "float roughness" 0.5
+        "rgb k" [.2 .9 .2]
+        "float roughness" 0.3
 
     MakeNamedMaterial "nerdMix"
         "string type" "mix"
-        "float amount" [0.1]
+        # "float amount" [0.1]
         "string namedmaterial1" "nerdMatte"
         "string namedmaterial2" "nerdMetal"
 
@@ -221,13 +221,13 @@ def getLightIntensity(light):
 
 def exportPbrt(filePath):
     assert filePath.endswith('.pbrt')
-    
+
     # directory for geometry for this scene
     geoDirName = os.path.basename(sceneName()) + '.pbrt.d'
     geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
     if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
     for p in glob.glob(geoDirPath + '/*'): os.remove(p)
-    
+
     # camera
     # by default we use the editors perspective view
     camera = nt.Camera(u'perspShape')
@@ -263,7 +263,7 @@ def exportPbrt(filePath):
         else:
             print "Unknown light type: " + str(light)
             continue
-        
+
         worldAttributes += commentTemplate.format(comment=light.nodeName())
         worldAttributes += lightTemplate.format(
             transform=indent(stringContents2D(light.getParent().getTransformation()), 2),
@@ -331,21 +331,21 @@ def exportPbrt(filePath):
         # except:
         #     print 'bad color'
 
-        
+
         geoFileName = base64.b64encode(mesh.nodeName()) + '.pbrt'
         geoFilePath = geoDirPath + '/' + geoFileName
-        
+
         geoAttributes = geoTemplate.format(
             indices =stringContents(indices),
             points  =indent(stringContents2D(verts),   3),
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
-        
+
         with open(geoFilePath, 'w') as geoFile:
             geoFile.write(commentTemplate.format(comment=mesh.nodeName()))
             geoFile.write(geoAttributes)
-        
+
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=mesh.nodeName())
         worldAttributes += meshTemplate.format(
@@ -386,21 +386,21 @@ def exportPbrt(filePath):
         print 'shape up'
         print normals.shape
         normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
-        
+
         geoFileName = base64.b64encode(metaball.nodeName()) + '.pbrt'
         geoFilePath = geoDirPath + '/' + geoFileName
-        
+
         geoAttributes = geoTemplate.format(
             indices =stringContents(faces[:,:,0].reshape((-1,))),  # first, take only the first indecies. then linearize
             points  =indent(stringContents2D(vertices),   3),
             normalString=normalString,
             # UVs     =indent(stringContents2D(zip(*UVs)), 3),
         )
-        
+
         with open(geoFilePath, 'w') as geoFile:
             geoFile.write(commentTemplate.format(comment=metaball.nodeName()))
             geoFile.write(geoAttributes)
-        
+
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=metaball.nodeName())
         worldAttributes += meshTemplate.format(
@@ -438,21 +438,29 @@ def render():
     exportPbrt(path_pbrtFile)
     # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile))
 
+    print 'starting rendering'
     p = subprocess.Popen([
-            '{2} --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile, path_pbrtExecutable)
+            # '{} --outfile "{}" "{}"'.format(path_pbrtExecutable, path_exr, path_pbrtFile)
+            path_pbrtExecutable,
+            '--outfile',
+            path_exr,
+            path_pbrtFile
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True  # bad security practice
+        # stdout=sys.__stdout__,
+        # stderr=sys.__stderr__,
+        # shell=True  # bad security practice
     )
 
-    print
-    print ' ====== begin pbrt output ====== '
-    out, err = p.communicate()
-    # print out
-    print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
-    print ' ====== end pbrt output ====== '
-    print
+    p.communicate()
+    print 'rendering finished'
+
+    # print
+    # print ' ====== begin pbrt output ====== '
+    # out, err = p.communicate()
+    # # print out
+    # print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
+    # print ' ====== end pbrt output ====== '
+    # print
 
     os.system('convert "{0}" "{1}"'.format(path_exr, path_png))  # convert .exr to .png
 
