@@ -87,7 +87,7 @@ class CandyManager(object):
     # re-does the bloomy in a different quality
     def repolygonize(self, polygonSpacing, path_obj=None):
         if path_obj is None:
-            self.candyBox.path_obj
+            path_obj = self.candyBox.path_obj
         print 'repolygonize'
         makeBlobby.polygonize(
             self.candyBox.path_bloomy,

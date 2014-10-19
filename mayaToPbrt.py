@@ -69,7 +69,7 @@ PixelFilter "mitchell"
     "float ywidth" [2]
 
 Sampler "bestcandidate"
-    "integer pixelsamples" [50]
+    "integer pixelsamples" [32]
 
 Film "image"
     "integer xresolution" [768]
@@ -138,7 +138,9 @@ emitterTemplate = '''AttributeBegin
     ConcatTransform [
 {transform}
     ]
+
     Include "{geoFilePath}"
+
 AttributeEnd
 
 '''
@@ -204,7 +206,7 @@ damascusTextureTemplate = '''
 nerdTextureTemplate = '''
     MakeNamedMaterial "nerdMatte"
         "string type" "matte"
-        "rgb Kd" [.1 .4 .1]
+        "rgb Kd" [.3 .7 .3]
 
 
     MakeNamedMaterial "nerdPlastic"
@@ -215,12 +217,12 @@ nerdTextureTemplate = '''
     MakeNamedMaterial "nerdMetal"
         "string type" "metal"
         "rgb eta" [1.0 1.0 1.0]
-        "rgb k" [.1 .9 .1]
-        "float roughness" 0.5
+        "rgb k" [.2 .9 .2]
+        "float roughness" 0.3
 
     MakeNamedMaterial "nerdMix"
         "string type" "mix"
-        "float amount" [0.1]
+        # "float amount" [0.1]
         "string namedmaterial1" "nerdMatte"
         "string namedmaterial2" "nerdMetal"
 
@@ -493,21 +495,29 @@ def render() :
     exportPbrt(pbrtTemplate, path_pbrtFile)
     # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile))
 
+    print 'starting rendering'
     p = subprocess.Popen([
-            '{2} --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile, path_pbrtExecutable)
+            # '{} --outfile "{}" "{}"'.format(path_pbrtExecutable, path_exr, path_pbrtFile)
+            path_pbrtExecutable,
+            '--outfile',
+            path_exr,
+            path_pbrtFile
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True  # bad security practice
+        # stdout=sys.__stdout__,
+        # stderr=sys.__stderr__,
+        # shell=True  # bad security practice
     )
 
-    print
-    print ' ====== begin pbrt output ====== '
-    out, err = p.communicate()
-    # print out
-    print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
-    print ' ====== end pbrt output ====== '
-    print
+    p.communicate()
+    print 'rendering finished'
+
+    # print
+    # print ' ====== begin pbrt output ====== '
+    # out, err = p.communicate()
+    # # print out
+    # print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
+    # print ' ====== end pbrt output ====== '
+    # print
 
     os.system('convert "{0}" "{1}"'.format(path_exr, path_png))  # convert .exr to .png
 

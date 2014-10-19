@@ -74,7 +74,7 @@ Translate(
 def polygonize(path_bloomy, path_obj, polygonSpacing=None):
 
     # adjust polygonSpacing if needed
-    if polygonSpacing:
+    if polygonSpacing is not None:
         # appending to the file
         # not the most effictient way of doing things but it works
         with open(path_bloomy, 'a') as f:
@@ -83,7 +83,7 @@ def polygonize(path_bloomy, path_obj, polygonSpacing=None):
 
 
     # os.system("{} {} {}".format(path_polygonizer, path_bloomy, path_obj))
-    programArgs = [path_polygonizer, path_bloomy, path_obj]
+    programArgs = [ path_polygonizer, path_bloomy, path_obj ]
     subprocess.Popen(programArgs).communicate()
     if not p.exists(path_obj):
         raise Exception("polygonization failed: " + ' '.join(programArgs))
