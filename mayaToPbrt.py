@@ -13,7 +13,6 @@ addToPath(path_this)
 ###### config ######
 
 path_pbrtExecutable = '~/teamCandy/comp408-project3/build/bin/pbrt'     # eg. '~/408/final/comp408-project3/bin/pbrt'
-rePolygonize = False
 slowNormals = False
 
 ###### end config ######
@@ -60,7 +59,7 @@ Scale -1 1 1
 LookAt
     {camPos}
     {camLookAt}
-    0 1 0
+    {camUp}
 
 Camera "perspective"
     "float fov" [{camFov}]
@@ -73,18 +72,31 @@ Sampler "bestcandidate"
     "integer pixelsamples" [32]
 
 Film "image"
-    "integer xresolution" [400]
-    "integer yresolution" [400]
+    "integer xresolution" [768]
+    "integer yresolution" [512]
 
 WorldBegin
 
-# AttributeBegin
-#     CoordSysTransform "camera"
-#     LightSource "distant"
-#         "point from" [0 0 0]
-#         "point to"   [0 0 1]
-#         "rgb L"    [1 1 1]
-# AttributeEnd
+TransformBegin
+    # it is NOT possible to line up everything in the envmap
+    #Rotate 16.8 1 0 0
+    Rotate 90 0 0 1
+    Rotate 90 0 1 0
+
+    LightSource "infinite"
+        "color L" [0.500000 0.500000 0.500000]
+        "integer nsamples" [5]
+        "string mapname" "../images/CO332_26-05-2014_TeamCandy_2k flipped.exr"
+
+TransformEnd
+
+AttributeBegin
+    CoordSysTransform "camera"
+    LightSource "distant"
+        "point from" [0 0 0]
+        "point to"   [0 0 1]
+        "rgb L"    [1 1 1]
+AttributeEnd
 
 {worldAttributes}
 
@@ -227,16 +239,17 @@ def exportPbrt(filePath):
     geoDirName = os.path.basename(sceneName()) + '.pbrt.d'
     geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
     if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
-    for geoPath in glob.glob(geoDirPath + '/*'): os.remove(geoPath)
+    for p in glob.glob(geoDirPath + '/*'): os.remove(p)
 
     # camera
-    # by default we use the editors perspective view
-    camera = nt.Camera(u'perspShape')
+    # by default we use the <st>editors perspective view</st> 408 render camera
+    camera = nt.Camera(u'cameraShape2')
     camTransform = camera.getParent()
-    camPos = camTransform.getTranslation()
+    camPos = camTransform.getTranslation(space='world')
     camTransformString = stringContents2D(camTransform.getTransformation())
     camTransformString = stringContents2D(camTransform.getTransformation().asRotateMatrix())
     camLookAt = camera.getCenterOfInterestPoint('world')
+    camUp = camera.getWorldUp()
 
     worldAttributes = ''
 
@@ -368,23 +381,24 @@ def exportPbrt(filePath):
         path_bloomy = '{}/candyBox_{}.bloomy'.format(        candyBox.path_baseBloomy, metaball.name())
         path_obj    = '{}/candyBox_{}_pbrtExport.obj'.format(candyBox.path_baseObj,    metaball.name())
 
-        if rePolygonize or not p.exists(path_obj):
-            print 'rePolygonizing'
-            candyBox.makeBlobby.polygonize(
-                path_bloomy,
-                path_obj,
-                polygonSpacing=0.05
-                # polygonSpacing=0.5
-            )
+
+        candyBox.makeBlobby.polygonize(
+            path_bloomy,
+            path_obj,
+            polygonSpacing=0.05
+            # polygonSpacing=0.5
+        )
 
         with open(path_obj) as f:
             lines = f.readlines()
         vertices  = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('v ' )])
         normals   = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('vn ')])
         faces     = np.array([ [ map(lambda x: int(x)-1, corner.split('//')) for corner in line.split()[1:] ] for line in lines if line.startswith('f ' )])
-        # print 'metaball with vertices:', len(vertices)
+        print 'len', len(vertices)
 
 
+        print 'shape up'
+        print normals.shape
         normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
 
         geoFileName = base64.b64encode(metaball.nodeName()) + '.pbrt'
@@ -415,7 +429,8 @@ def exportPbrt(filePath):
         # camTranslate=stringContents(camPos),
         camPos      =stringContents(camPos),
         camLookAt   =stringContents(camLookAt),
-        camFov=camera.getHorizontalFieldOfView(),
+        camUp       =stringContents(camUp),
+        camFov=camera.getVerticalFieldOfView(),
         filename=os.path.basename(filePath),
         worldAttributes=worldAttributes,
     )
