@@ -32,8 +32,8 @@ def initializePlugin(mobject):
     layout = columnLayout()
     preview = image(
         # image=sceneName()+'.pbrt.exr.png',
-        width=200,
-        height=200,
+        width=400,
+        height=400,
     )
     button(
         command=Callback(doRender, preview),

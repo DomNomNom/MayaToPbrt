@@ -13,6 +13,7 @@ addToPath(path_this)
 ###### config ######
 
 path_pbrtExecutable = '~/teamCandy/comp408-project3/build/bin/pbrt'     # eg. '~/408/final/comp408-project3/bin/pbrt'
+rePolygonize = False
 slowNormals = False
 
 ###### end config ######
@@ -69,11 +70,11 @@ PixelFilter "mitchell"
     "float ywidth" [2]
 
 Sampler "bestcandidate"
-    "integer pixelsamples" [320]
+    "integer pixelsamples" [32]
 
 Film "image"
-    "integer xresolution" [200]
-    "integer yresolution" [200]
+    "integer xresolution" [400]
+    "integer yresolution" [400]
 
 WorldBegin
 
@@ -226,7 +227,7 @@ def exportPbrt(filePath):
     geoDirName = os.path.basename(sceneName()) + '.pbrt.d'
     geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
     if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
-    for p in glob.glob(geoDirPath + '/*'): os.remove(p)
+    for geoPath in glob.glob(geoDirPath + '/*'): os.remove(geoPath)
 
     # camera
     # by default we use the editors perspective view
@@ -367,24 +368,23 @@ def exportPbrt(filePath):
         path_bloomy = '{}/candyBox_{}.bloomy'.format(        candyBox.path_baseBloomy, metaball.name())
         path_obj    = '{}/candyBox_{}_pbrtExport.obj'.format(candyBox.path_baseObj,    metaball.name())
 
-
-        candyBox.makeBlobby.polygonize(
-            path_bloomy,
-            path_obj,
-            polygonSpacing=0.05
-            # polygonSpacing=0.5
-        )
+        if rePolygonize or not p.exists(path_obj):
+            print 'rePolygonizing'
+            candyBox.makeBlobby.polygonize(
+                path_bloomy,
+                path_obj,
+                polygonSpacing=0.05
+                # polygonSpacing=0.5
+            )
 
         with open(path_obj) as f:
             lines = f.readlines()
         vertices  = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('v ' )])
         normals   = np.array([ map(float,                                                  line.split()[1:])  for line in lines if line.startswith('vn ')])
         faces     = np.array([ [ map(lambda x: int(x)-1, corner.split('//')) for corner in line.split()[1:] ] for line in lines if line.startswith('f ' )])
-        print 'len', len(vertices)
+        # print 'metaball with vertices:', len(vertices)
 
 
-        print 'shape up'
-        print normals.shape
         normalString = normalTemplate.format(normals=indent(stringContents2D(normals), 3))
 
         geoFileName = base64.b64encode(metaball.nodeName()) + '.pbrt'
