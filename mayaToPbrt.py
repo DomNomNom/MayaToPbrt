@@ -77,7 +77,7 @@ Film "image"
 
 DifferentialEnable
 DifferentialBackground "string filename" "../images/background256.exr"
-DifferentialHDR "exponential" "float exposure" [0.5] "float diffscale" [2.0]
+DifferentialHDR "exponential" "float exposure" [0.8] "float diffscale" [1.0]
 
 WorldBegin
 
@@ -88,19 +88,19 @@ TransformBegin
     Rotate 90 0 1 0
 
     LightSource "infinite"
-        "color L" [0.500000 0.500000 0.500000]
+        "color L" [0.1 0.1 0.1]
         "integer nsamples" [5]
         "string mapname" "../images/CO332_26-05-2014_TeamCandy_2k flipped.exr"
 
 TransformEnd
 
-AttributeBegin
-    CoordSysTransform "camera"
-    LightSource "distant"
-        "point from" [0 0 0]
-        "point to"   [0 0 1]
-        "rgb L"    [1 1 1]
-AttributeEnd
+# AttributeBegin
+#     CoordSysTransform "camera"
+#     LightSource "distant"
+#         "point from" [0 0 0]
+#         "point to"   [0 0 1]
+#         "rgb L"    [1 1 1]
+# AttributeEnd
 
 {worldAttributes}
 
@@ -332,6 +332,13 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
                         pbrtTexture.attr('attrib_hammerFrequency').get(),
                         pbrtTexture.attr('attrib_layerThickness').get()
                     )
+                elif isinstance(lambert, nt.Blinn) :
+                    materialString = 'Material "plastic" "rgb Kd" [ {0} ] "rgb Ks" [ {1} ] "float roughness" {2}'.format(
+                        stringContents(lambert.getColor()[:-1]),
+                        stringContents(lambert.getSpecularColor()[:-1]),
+                        lambert.getEccentricity()
+                    )
+
                 else:
                     materialString = 'Material "matte" "rgb Kd" [ {0} ]'.format(
                         stringContents(lambert.getColor()[:-1])
@@ -505,31 +512,31 @@ def render() :
     exportPbrt(pbrtTemplate, path_pbrtFile)
     # os.system('~/pbrt-v2-master/src/bin/pbrt --outfile "{0}" "{1}"'.format(path_exr, path_pbrtFile))
 
-    print 'starting rendering'
-    p = subprocess.Popen([
-            # '{} --outfile "{}" "{}"'.format(path_pbrtExecutable, path_exr, path_pbrtFile)
-            path_pbrtExecutable,
-            '--outfile',
-            path_exr,
-            path_pbrtFile
-        ],
-        # stdout=sys.__stdout__,
-        # stderr=sys.__stderr__,
-        # shell=True  # bad security practice
-    )
+    # print 'starting rendering'
+    # p = subprocess.Popen([
+    #         # '{} --outfile "{}" "{}"'.format(path_pbrtExecutable, path_exr, path_pbrtFile)
+    #         path_pbrtExecutable,
+    #         '--outfile',
+    #         path_exr,
+    #         path_pbrtFile
+    #     ],
+    #     # stdout=sys.__stdout__,
+    #     # stderr=sys.__stderr__,
+    #     # shell=True  # bad security practice
+    # )
 
-    p.communicate()
-    print 'rendering finished'
+    # p.communicate()
+    # print 'rendering finished'
 
-    # print
-    # print ' ====== begin pbrt output ====== '
-    # out, err = p.communicate()
-    # # print out
-    # print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
-    # print ' ====== end pbrt output ====== '
-    # print
+    # # print
+    # # print ' ====== begin pbrt output ====== '
+    # # out, err = p.communicate()
+    # # # print out
+    # # print err.replace("Error in ioctl() in TerminalWidth(): 25", "")
+    # # print ' ====== end pbrt output ====== '
+    # # print
 
-    os.system('convert "{0}" "{1}"'.format(path_exr, path_png))  # convert .exr to .png
+    # os.system('convert "{0}" "{1}"'.format(path_exr, path_png))  # convert .exr to .png
 
     return path_png
 
