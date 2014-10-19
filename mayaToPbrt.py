@@ -59,7 +59,7 @@ Scale -1 1 1
 LookAt
     {camPos}
     {camLookAt}
-    0 1 0
+    {camUp}
 
 Camera "perspective"
     "float fov" [{camFov}]
@@ -72,10 +72,23 @@ Sampler "bestcandidate"
     "integer pixelsamples" [50]
 
 Film "image"
-    "integer xresolution" [400]
-    "integer yresolution" [400]
+    "integer xresolution" [768]
+    "integer yresolution" [512]
 
 WorldBegin
+
+TransformBegin
+    # it is NOT possible to line up everything in the envmap
+    #Rotate 16.8 1 0 0
+    Rotate 90 0 0 1
+    Rotate 90 0 1 0
+
+    LightSource "infinite"
+        "color L" [0.500000 0.500000 0.500000]
+        "integer nsamples" [5]
+        "string mapname" "../images/background256.exr"
+
+TransformEnd
 
 AttributeBegin
     CoordSysTransform "camera"
@@ -239,13 +252,14 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
     for p in glob.glob(geoDirPath + '/*'): os.remove(p)
 
     # camera
-    # by default we use the editors perspective view
-    camera = nt.Camera(u'perspShape')
+    # by default we use the <st>editors perspective view</st> 408 render camera
+    camera = nt.Camera(u'cameraShape2')
     camTransform = camera.getParent()
-    camPos = camTransform.getTranslation()
+    camPos = camTransform.getTranslation(space='world')
     camTransformString = stringContents2D(camTransform.getTransformation())
     camTransformString = stringContents2D(camTransform.getTransformation().asRotateMatrix())
     camLookAt = camera.getCenterOfInterestPoint('world')
+    camUp = camera.getWorldUp()
 
     worldAttributes = ''
 
@@ -416,7 +430,8 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
         # camTranslate=stringContents(camPos),
         camPos      =stringContents(camPos),
         camLookAt   =stringContents(camLookAt),
-        camFov=camera.getHorizontalFieldOfView(),
+        camUp       =stringContents(camUp),
+        camFov=camera.getVerticalFieldOfView(),
         filename=os.path.basename(filePath),
         worldAttributes=worldAttributes,
     )
