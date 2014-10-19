@@ -14,6 +14,7 @@ addToPath(path_this)
 
 path_pbrtExecutable = '~/teamCandy/comp408-project3/build/bin/pbrt'     # eg. '~/408/final/comp408-project3/bin/pbrt'
 slowNormals = False
+magicPrefix = 'mayasux'
 
 ###### end config ######
 
@@ -72,8 +73,10 @@ Sampler "bestcandidate"
     "integer pixelsamples" [32]
 
 Film "image"
-    "integer xresolution" [768]
-    "integer yresolution" [512]
+
+DifferentialEnable
+DifferentialBackground "string filename" "../images/background256.exr"
+DifferentialHDR "exponential" "float exposure" [0.5] "float diffscale" [2.0]
 
 WorldBegin
 
@@ -86,7 +89,7 @@ TransformBegin
     LightSource "infinite"
         "color L" [0.500000 0.500000 0.500000]
         "integer nsamples" [5]
-        "string mapname" "../images/background256.exr"
+        "string mapname" "../images/CO332_26-05-2014_TeamCandy_2k flipped.exr"
 
 TransformEnd
 
@@ -119,7 +122,11 @@ AttributeBegin
 AttributeEnd
 '''
 
+differentialTemplate = '''DifferentialBegin
+{diff}
+DifferentialEnd
 
+'''
 
 meshTemplate = '''AttributeBegin
     ConcatTransform [
@@ -291,10 +298,12 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
             continue
 
         worldAttributes += commentTemplate.format(comment=light.nodeName())
-        worldAttributes += lightTemplate.format(
+        lightString = lightTemplate.format(
             transform=indent(stringContents2D(light.getParent().getTransformation()), 2),
             lightText=lightText,
         )
+
+        worldAttributes += lightString if magicPrefix in light.nodeName() else differentialTemplate.format( diff=lightString )
 
     # meshes
     for mesh in ls(type='mesh'):
@@ -328,11 +337,13 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
                     )
 
         worldAttributes += commentTemplate.format(comment=mesh.nodeName())
-        worldAttributes += meshTemplate.format(
-            transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
-            materialString=materialString,
-            geoFilePath=geoDirString
-        )
+        meshString = meshTemplate.format(
+                transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
+                materialString=materialString,
+                geoFilePath=geoDirString
+            )
+
+        worldAttributes += meshString if magicPrefix in mesh.nodeName() else differentialTemplate.format( diff=meshString )
 
     #lightning
     for lightning in ls(type='nurbsSurface'):
@@ -370,10 +381,10 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
         materialString = ''
 
         worldAttributes += commentTemplate.format(comment='LIGHTNING -- ' + mesh.nodeName())
-        worldAttributes += emitterTemplate.format(
+        worldAttributes += differentialTemplate.format( diff = emitterTemplate.format(
             transform=indent(stringContents2D(mesh.getParent().getTransformation()), 2),
             geoFilePath=geoDirString
-        )
+        ))
 
         delete( lightningTransform )
 
@@ -420,11 +431,11 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
 
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=metaball.nodeName())
-        worldAttributes += meshTemplate.format(
+        worldAttributes += differentialTemplate.format( diff = meshTemplate.format(
             transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
             materialString=nerdTextureTemplate,
             geoFilePath=geoDirName + '/' + geoFileName
-        )
+        ))
 
     # compose
     pbrt = pbrtWrapperTemplate.format(
