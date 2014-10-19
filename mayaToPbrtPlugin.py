@@ -21,9 +21,9 @@ frames = 5
 
 
 def doRender( preview ):
-    reload( mayaToPbrt )
+    reload(mayaToPbrt)
     pngPath = mayaToPbrt.render()
-    preview.setImage( pngPath )
+    preview.setImage(pngPath)
     print 'done', pngPath
 
 
