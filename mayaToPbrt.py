@@ -76,7 +76,7 @@ Sampler "bestcandidate"
 Film "image"
 
 DifferentialEnable
-DifferentialBackground "string filename" "../images/background256.exr"
+DifferentialBackground "string filename" "../images/background512.exr"
 DifferentialHDR "exponential" "float exposure" [0.5] "float diffscale" [2.0]
 
 WorldBegin
@@ -212,21 +212,23 @@ damascusTextureTemplate = '''
 '''
 
 nerdTextureTemplate = '''
-    MakeNamedMaterial "nerdMatte"
-        "string type" "matte"
-        "rgb Kd" [.3 .7 .3]
-
 
     MakeNamedMaterial "nerdPlastic"
         "string type" "plastic"
-        "rgb Kd" [.1 .4 .1]
+        "rgb Kd" [.1 .5 .1]
         "float roughness" [0.2]
+
+
+
+    MakeNamedMaterial "nerdMatte"
+        "string type" "matte"
+        "rgb Kd" [.3 1.0 .3]
 
     MakeNamedMaterial "nerdMetal"
         "string type" "metal"
         "rgb eta" [1.0 1.0 1.0]
-        "rgb k" [.2 .9 .2]
-        "float roughness" 0.3
+        "rgb k" [.2 1.0 .1]
+        "float roughness" 0.2
 
     MakeNamedMaterial "nerdMix"
         "string type" "mix"
@@ -238,9 +240,27 @@ nerdTextureTemplate = '''
     # NamedMaterial "nerdPlastic"
     # NamedMaterial "nerdMetal"
     NamedMaterial "nerdMix"
-
 '''
 
+nerdTextureTemplateYellow = '''
+    MakeNamedMaterial "nerdMatteY"
+        "string type" "matte"
+        "rgb Kd" [0.5 0.5 .1]
+
+    MakeNamedMaterial "nerdMetalY"
+        "string type" "metal"
+        "rgb eta" [1.0 1.0 1.0]
+        "rgb k" [0.7 0.7 .0]
+        "float roughness" 0.2
+
+    MakeNamedMaterial "nerdMixY"
+        "string type" "mix"
+        # "float amount" [0.1]
+        "string namedmaterial1" "nerdMatte"
+        "string namedmaterial2" "nerdMetal"
+
+
+'''
 
 
 def grouper(n, iterable, fillvalue=None):
@@ -251,6 +271,11 @@ def grouper(n, iterable, fillvalue=None):
 def getLightIntensity(light):
     return (light.getColor()*light.getIntensity())[:-1]
 
+# def ensurePathExists(path):
+#     path = p.dirname(path)
+#     if not p.exists(path):
+#         os.makedirs(path)
+
 
 def exportPbrt(pbrtWrapperTemplate, filePath):
     assert filePath.endswith('.pbrt')
@@ -258,7 +283,7 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
     # directory for geometry for this scene
     geoDirName = os.path.basename(filePath) + '.d'
     geoDirPath = os.path.dirname(filePath) + '/' + geoDirName
-    if not os.path.exists(geoDirPath): os.mkdir(geoDirPath)
+    if not os.path.exists(geoDirPath): os.makedirs(geoDirPath)
     for path_geo in glob.glob(geoDirPath + '/*'): os.remove(path_geo)
 
     # camera
@@ -390,6 +415,7 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
         delete( lightningTransform )
 
 
+    seed = 1337
     # metaballs
     for metaball in ls(type='CandyBox'):
         print 'processing metaball:', metaball.name()
@@ -428,11 +454,18 @@ def exportPbrt(pbrtWrapperTemplate, filePath):
             geoFile.write(commentTemplate.format(comment=metaball.nodeName()))
             geoFile.write(geoAttributes)
 
+        seed += 1
+        np.random.seed(seed)
+        if (np.random.choice([1,0])):
+            material = nerdTextureTemplate
+        else:
+            material = nerdTextureTemplateYellow
+
         # indices[1::3], indices[2::3] = indices[2::3], indices[1::3]
         worldAttributes += commentTemplate.format(comment=metaball.nodeName())
         worldAttributes += differentialTemplate.format( diff = meshTemplate.format(
             transform=indent(stringContents2D(metaball.getParent().getTransformation()), 2),
-            materialString=nerdTextureTemplate,
+            materialString=material,
             geoFilePath=geoDirName + '/' + geoFileName
         ))
 
@@ -546,7 +579,7 @@ def exportSequence( frame ) :
     if currentTime( query = True ) is not frame :
         currentTime( frame, edit = True )
 
-    pbrtScenes = 'teamCandy/scenesPbrt/'
+    pbrtScenes = p.expanduser('~/teamCandy/scenesPbrt/')
 
     scenePath = sceneName()
     assert scenePath
